@@ -32,13 +32,14 @@ npm start
 
 ## 📡 API Usage
 
-### 1. Authenticate (Get Token)
-```bash
-curl -X POST http://localhost:3000/auth/login \
-     -H "Content-Type: application/json" \
-     -d '{"username": "anukul"}'
-```
-**Returns:** `{"accessToken": "eyJ..."}`
+### 1. Authentication (External JWT Support)
+You can generate JWT tokens on your own external auth server.
+**Requirement:** Both servers must use the **SAME** `JWT_SECRET`.
+
+If you send a token generated elsewhere, this server will decode it and extract:
+- `user.id` or `user.username` (to identify the memory file)
+
+**Header:** `Authorization: Bearer <EXTERNAL_TOKEN>`
 
 ### 2. Chat (Send Message)
 ```bash
