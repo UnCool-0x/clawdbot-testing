@@ -19,7 +19,7 @@ if (!fs.existsSync(MEMORY_DIR)) {
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -50,11 +50,19 @@ const getContext = (userId) => {
     return fs.readFileSync(filePath, 'utf8');
 };
 
+const { exec } = require('child_process');
+
+// Helper: Append to memory & Auto-Push
 const updateMemory = (userId, role, content) => {
     const filePath = path.join(MEMORY_DIR, `${userId}.md`);
     const timestamp = new Date().toISOString();
     const entry = `\n[${timestamp}] **${role}**: ${content}\n`;
     fs.appendFileSync(filePath, entry);
+
+    // Auto-Push to GitHub (Background)
+    exec('git add . && git commit -m "Auto-update memory" && git push origin main', { cwd: __dirname }, (error, stdout, stderr) => {
+        if (error) console.error(`Git Auto-Push Error: ${error.message}`);
+    });
 };
 
 // --- Routes ---
