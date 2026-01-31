@@ -9,23 +9,61 @@ if (!fs.existsSync(config.MEMORY_DIR)) {
 }
 
 const getContext = (userId) => {
-    const filePath = path.join(config.MEMORY_DIR, `${userId}.md`);
-    if (!fs.existsSync(filePath)) {
+    // 1. Read Chat History (MD)
+    const chatPath = path.join(config.MEMORY_DIR, `${userId}.md`);
+    let chatHistory = "";
+    
+    if (!fs.existsSync(chatPath)) {
         const initContent = `# Memory for User: ${userId}\nCreated: ${new Date().toISOString()}\n\n---\n`;
-        fs.writeFileSync(filePath, initContent);
-        return initContent;
+        fs.writeFileSync(chatPath, initContent);
+        chatHistory = initContent;
+    } else {
+        chatHistory = fs.readFileSync(chatPath, 'utf8');
     }
-    return fs.readFileSync(filePath, 'utf8');
+
+    // 2. Read User Context/Profile (MD) - Optional manual context file
+    const contextPath = path.join(config.MEMORY_DIR, `${userId}_context.md`);
+    let userContext = "";
+    if (fs.existsSync(contextPath)) {
+        userContext = fs.readFileSync(contextPath, 'utf8');
+    }
+
+    // Combine for LLM
+    // If context exists, prioritize it at the top
+    if (userContext.trim()) {
+        return `IMPORTANT USER CONTEXT:\n${userContext}\n\n================\nCHAT HISTORY:\n${chatHistory}`;
+    }
+    
+    return chatHistory;
 };
 
 const appendInteraction = (userId, userMsg, assistantMsg) => {
-    const filePath = path.join(config.MEMORY_DIR, `${userId}.md`);
     const timestamp = new Date().toISOString();
     
-    const entry = `\n[${timestamp}] **User**: ${userMsg}\n[${timestamp}] **Assistant**: ${assistantMsg}\n`;
+    // 1. Append to Markdown (Standard Log)
+    const mdPath = path.join(config.MEMORY_DIR, `${userId}.md`);
+    const mdEntry = `\n[${timestamp}] **User**: ${userMsg}\n[${timestamp}] **Assistant**: ${assistantMsg}\n`;
+    fs.appendFileSync(mdPath, mdEntry);
     
-    fs.appendFileSync(filePath, entry);
+    // 2. Append to JSON (Structured Data)
+    const jsonPath = path.join(config.MEMORY_DIR, `${userId}.json`);
+    let history = [];
     
+    try {
+        if (fs.existsSync(jsonPath)) {
+            const fileContent = fs.readFileSync(jsonPath, 'utf8');
+            history = JSON.parse(fileContent);
+        }
+    } catch (e) {
+        console.error("Error reading JSON memory:", e);
+        history = [];
+    }
+
+    history.push({ role: 'user', content: userMsg, timestamp });
+    history.push({ role: 'assistant', content: assistantMsg, timestamp });
+
+    fs.writeFileSync(jsonPath, JSON.stringify(history, null, 2));
+
     // Trigger Auto-Sync
     syncToRemote();
 };
